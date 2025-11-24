@@ -6,7 +6,12 @@ COPY --from=node:20-alpine /usr/local/lib/node_modules /usr/local/lib/node_modul
 WORKDIR /var/www/html
 
 RUN apk add --no-cache libzip-dev zip shadow \
-    && docker-php-ext-install pdo pdo_mysql zip bcmath
+    autoconf \
+    g++ \
+    make \
+    librdkafka-dev \
+    && docker-php-ext-install pdo pdo_mysql zip bcmath rdkafka \
+    && pecl install rdkafka
 
 RUN usermod --uid 1000 www-data
 
