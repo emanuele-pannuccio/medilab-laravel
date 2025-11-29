@@ -10,16 +10,15 @@ RUN apk add --no-cache libzip-dev zip shadow \
     g++ \
     make \
     librdkafka-dev \
-    && docker-php-ext-install pdo pdo_mysql zip bcmath rdkafka \
-    && pecl install rdkafka
+    && docker-php-ext-install pdo pdo_mysql zip bcmath pcntl
+
+RUN pecl install rdkafka && docker-php-ext-enable rdkafka
 
 RUN usermod --uid 1000 www-data
 
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 COPY --chown=www-data:www-data . .
-
-RUN docker-php-ext-install pcntl
 
 RUN chmod u+x /var/www/html/entrypoint.sh
 

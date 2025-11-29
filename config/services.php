@@ -17,7 +17,12 @@ return [
     'postmark' => [
         'token' => env('POSTMARK_TOKEN'),
     ],
-
+    'elasticsearch' => [
+        'host' => env('ELASTICSEARCH_HOST', 'host.docker.internal:9200'),
+        'api_key' => env('ELASTICSEARCH_API_KEY'),
+        'username' => env('ELASTICSEARCH_USER'),
+        'password' => env('ELASTICSEARCH_PASS'),
+    ],
     'resend' => [
         'key' => env('RESEND_KEY'),
     ],

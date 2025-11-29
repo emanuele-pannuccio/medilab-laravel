@@ -23,12 +23,5 @@ class DatabaseSeeder extends Seeder
             DepartmentSeeder::class,
             UserSeeder::class
         ]);
-
-        Patient::factory()->count(5)->create();
-        User::factory()->count(10)->create();
-
-        Report::factory()->count(10)->create();
-
-
     }
 }

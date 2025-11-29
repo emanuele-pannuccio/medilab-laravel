@@ -9,6 +9,8 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
+use Ramsey\Uuid\Uuid;
+
 class ReportController extends Controller
 {
     /**
@@ -42,37 +44,52 @@ class ReportController extends Controller
 
         $query->orderBy('hospitalization_date', 'desc');
 
+        if ($request->filled('nome_paziente')) {
+            $query->whereHas('patient', function ($patientQuery) use ($request) {
+                $patientQuery->where('name', $request->query('nome_paziente'));
+            });
+        }
+
+        $query->orderBy('hospitalization_date', 'desc');
+
         $reports = $query->paginate(15);
 
         return ReportResource::collection($reports);
     }
 
-    public function elaborate_document(Request $request){
-        $doctorId = 1; #auth()->user()->id;   // oppure da request
+    public function get_documents(Request $request){
+        return  Storage::disk('s3')->allFiles();
+    }
 
+    public function elaborate_document(Request $request){
+        $doctorId = auth('sanctum')->user()->id;
         $file = $request->file('document');
         $filename = $file->getClientOriginalName();
 
         // Contenuto del file
         $content = file_get_contents($file->getRealPath());
-
-        // Path su S3
-        $path = $filename;
+        $jobId = Uuid::uuid4()->toString();
 
         Storage::disk('s3')->put(
             $file->hashName(),
             $content,
             [
                 'Metadata' => [
-                    'doctor_id' => (string) $doctorId,
+                    'doctor' => (string) $doctorId,
+                    'filename' => (string) $filename,
+                    'job' => $jobId,
+                    'hash' => hash("sha256", $content)
                 ],
                 'ContentType' => $file->getMimeType(),
             ]
         );
 
-        return  $file->hashName();
+        return  response()->json(
+            ["status" => 201, "response" => [
+                "job" => $jobId
+            ]]
+        );
     }
-
 
     /**
      * Store a newly created resource in storage.

@@ -14,16 +14,16 @@ return new class extends Migration
     {
         Schema::create('reports', function (Blueprint $table) {
             $table->id();
-            $table->timestamp('hospitalization_date');
+            $table->date('hospitalization_date');
             $table->longText('present_illness_history');
             $table->longText('past_illness_history');
             $table->longText('clinical_evolution')->nullable();
-            $table->timestamp('discharge_date')->nullable();
+            $table->date('discharge_date')->nullable();
             $table->longText('discharge_description')->nullable();
             $table->foreignId('patientId')->references("id")->on("patients");
             $table->foreignId('doctorId')->references("id")->on("users");
             $table->string('document');
-            $table->string('documentHash');
+            $table->string('documentHash')->unique();
             $table->enum("status", array_column(MedicalCaseStatus::cases(), 'value'))->default(MedicalCaseStatus::aperto->value);
             $table->timestamps();
         });

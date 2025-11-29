@@ -78,7 +78,7 @@ class PatientController extends Controller
             'city' => 'required|string|max:255',
         ]);
 
-        $validation["name"] = "pti-".hash_hmac('sha256', $validation["name"].$validation["birthday"].$validation["city"], config('app.key'));
+        $validation["name"] = "pti-".hash_hmac('sha256', hash_hmac('sha256', $validation["name"], config('app.key')).$validation["birthday"].$validation["city"], config('app.key'));
 
         $patient = Patient::firstOrCreate([ "name" => $validation["name"] ], $validation);
 

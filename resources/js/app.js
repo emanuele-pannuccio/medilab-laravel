@@ -1,9 +1,14 @@
 import './bootstrap';
 
 
+const userIdMeta = document.querySelector('meta[name="user-id"]');
 
-window.Echo
-    .channel('public-chat')
-    .listen('.message.sent', (e) => {
-        console.log('Messaggio ricevuto:', e.message);
-    });
+if (userIdMeta) {
+
+    const userId = userIdMeta.content;
+
+    window.Echo.private('doctors.' + userId)
+        .listen('.message.sent', (e) => {
+            console.log(e);
+        });
+}

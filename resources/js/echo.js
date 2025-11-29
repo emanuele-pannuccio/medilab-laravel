@@ -4,9 +4,9 @@ import Pusher from 'pusher-js';
 
 window.Echo = new Echo({
     broadcaster: 'reverb',
-    key: "my-app-key",
+    key: "0c4j4jjnudyjtitefyr7",
     wsHost: "192.168.1.187",
     wsPort: 8080,
-    forceTLS: ("http" ?? 'https') === 'https',
+    forceTLS: false,
     enabledTransports: ['ws', 'wss'],
 });

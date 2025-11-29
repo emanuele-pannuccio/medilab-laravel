@@ -54,8 +54,17 @@ Route::prefix("")->group(function(){
         Route::post('', [PatientController::class, 'store']);
         Route::get('', [PatientController::class, 'index']);
     });
+})->middleware("auth:sanctum");
+
+Route::middleware('auth:sanctum')->get('/notifications/unread', function (Request $request) {
+    return $request->user()->unreadNotifications;
 });
 
+Route::middleware('auth:sanctum')->post('/notifications/{id}/read', function (Request $request, $id) {
+    $notification = $request->user()->notifications()->findOrFail($id);
+    $notification->markAsRead();
+    return response()->json(['status' => 'success']);
+});
 
 Route::prefix('token')->group(function () {
     Route::post('', [AuthController::class, 'login']);

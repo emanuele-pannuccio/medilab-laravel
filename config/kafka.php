@@ -47,7 +47,7 @@ return [
 
     'sleep_on_error' => env('KAFKA_ERROR_SLEEP', 5),
 
-    'partition' => env('', 0),
+    'partition' => env('KAFKA_PARTITION', 0),
 
     /*
      | Kafka supports 4 compression codecs: none , gzip , lz4 and snappy
