@@ -262,7 +262,7 @@ $(function() {
 
     $('#send-btn').click(onSend)
     $chatInput.keypress((e) => {
-        if (e.key === 'Enter') onSend();
+        if (e.key === 'Enter' && !e.shiftKey) onSend();
     })
 
     $('#chatbot-toggle').on('click', function() {
@@ -270,13 +270,6 @@ $(function() {
         $('#chatbot-panel').removeClass('translate-x-full');
         $('body').css('overflow', 'hidden');
         $chatInput.focus();
-        
-        sendChat([
-            {
-                role: "user",
-                content: "Ciao, presentati dicendo chi sei e qual'è il tuo obiettivo."
-            }
-        ]);
     });
 
     $('#chatbotClose, #chatbotBackdrop').on('click', function() {
