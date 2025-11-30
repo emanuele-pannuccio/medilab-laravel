@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 use Ramsey\Uuid\Uuid;
+use PhpOffice\PhpWord\Element\TextRun;
 
 class ReportController extends Controller
 {
@@ -63,30 +64,35 @@ class ReportController extends Controller
 
     public function elaborate_document(Request $request){
         $doctorId = auth('sanctum')->user()->id;
-        $file = $request->file('document');
-        $filename = $file->getClientOriginalName();
+        $files = $request->file('documents');
+        $jobs = [];
+        
+        foreach ($files as $file) {
+            # code...
+            $filename = $file->getClientOriginalName();
+            // Contenuto del file
+            $content = file_get_contents($file->getRealPath());
+            $jobId = Uuid::uuid4()->toString();
+            array_push($jobs, $jobId);
 
-        // Contenuto del file
-        $content = file_get_contents($file->getRealPath());
-        $jobId = Uuid::uuid4()->toString();
-
-        Storage::disk('s3')->put(
-            $file->hashName(),
-            $content,
-            [
-                'Metadata' => [
-                    'doctor' => (string) $doctorId,
-                    'filename' => (string) $filename,
-                    'job' => $jobId,
-                    'hash' => hash("sha256", $content)
-                ],
-                'ContentType' => $file->getMimeType(),
-            ]
-        );
+            Storage::disk('s3')->put(
+                $file->hashName(),
+                $content,
+                [
+                    'Metadata' => [
+                        'doctor' => (string) $doctorId,
+                        'filename' => (string) $filename,
+                        'job' => $jobId,
+                        'hash' => hash("sha256", $content)
+                    ],
+                    'ContentType' => $file->getMimeType(),
+                ]
+            );
+        }
 
         return  response()->json(
             ["status" => 201, "response" => [
-                "job" => $jobId
+                "jobs" => $jobs
             ]]
         );
     }
@@ -97,25 +103,64 @@ class ReportController extends Controller
     public function store(Request $request)
     {
         $validation = $request->validate([
-            'hospitalization_date' => "required|date|date_format:Y-m-d H:i:s",
+            'hospitalization_date' => "required|date|date_format:Y-m-d",
             'past_illness_history' => "required|string",
-            'present_illness_history' => "string",
-            'clinical_evolution' => "string",
-            'discharge_date' => "date|date_format:Y-m-d H:i:s",
-            'discharge_description' => "string",
+            'present_illness_history' => "string|required",
+            'clinical_evolution' => "string|required",
+            'discharge_date' => "date|date_format:Y-m-d|required",
+            'discharge_description' => "string|required",
             'patient' => "required|exists:patients,id",
         ]);
-        $validation["hospitalization_date"] = Carbon::createFromFormat(
-            'Y-m-d H:i:s',
-            $request->hospitalization_date
-        )->toDateTimeString();
+
+        $templateProcessor = new \PhpOffice\PhpWord\TemplateProcessor('/var/www/html/resources/templates/template.docx');
 
         $report = Report::make($validation);
         $report->status = MedicalCaseStatus::aperto->value;
         $report->doctorId = auth('sanctum')->user()->id;
         $report->patientId = $request->patient;
+        $report->document = "";
+        $report->documentHash = "";
         $report->save();
-        return response()->json(["status" => 201, "response" => ["ok" => 1]], 201);
+
+        $patient = \App\Models\Patient::find($request->patient);
+        $validation["patient"] = $patient->name;
+        $validation["birthday"] = $patient->birthday;
+        $validation["city"] = $patient->city;
+        
+        $report->document = "";
+        $report->documentHash = "";
+        $keys = [];
+        foreach ($validation as $key => $value) {
+            $subs = new TextRun();
+            if(in_array($key, ["discharge_date", "hospitalization_date", "birthday"])) $value = Carbon::createFromFormat('Y-m-d', $value)->format('d/m/Y');
+            $keys[$key] = $value;
+            $subs->addText($value);
+            $templateProcessor->setComplexValue(strtoupper($key), $subs);
+        }
+        
+        $jobId = Uuid::uuid4()->toString();
+        $filename = '/var/www/html/resources/templates/'.$patient->name.'-'.$jobId.'.docx';
+        $templateProcessor->saveAs($filename);
+
+        $content = file_get_contents($filename);
+        $doctorId = auth()->user()->id;
+        Storage::disk('s3')->put(
+            hash("sha256", $filename),
+            $content,
+            [
+                'Metadata' => [
+                    'doctor' => (string) $doctorId,
+                    'filename' => (string) $filename,
+                    'job' => $jobId,
+                    'hash' => hash("sha256", $content)
+                ],
+                'ContentType' => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ]
+        );
+
+        delete($filename)
+
+        return response()->json(["status" => 201, "response" => ["ok" => 1, "test"=>$keys]], 201);
     }
 
     /**
@@ -134,11 +179,11 @@ class ReportController extends Controller
     public function update(Request $request, Report $report)
     {
         $validation = $request->validate([
-            'hospitalization_date' => "sometimes|date|date_format:Y-m-d H:i:s",
+            'hospitalization_date' => "sometimes|date|date_format:Y-m-d",
             'present_illness_history' => "sometimes|string",
             'past_illness_history' => "sometimes|string",
             'clinical_evolution' => "sometimes|string",
-            'discharge_date' => "sometimes|date|date_format:Y-m-d H:i:s",
+            'discharge_date' => "sometimes|date|date_format:Y-m-d",
             'discharge_description' => "sometimes|string",
             'patient' => "sometimes|exists:patients,id",
             'stato' => "sometimes|in:Aperto,Revisione,Chiuso,Analisi",

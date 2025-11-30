@@ -20,8 +20,8 @@ class Report extends Model
         "documentHash"
     ];
     protected $casts = [
-        'hospitalization_date' => 'datetime:d-m-Y H:i:s',
-        'discharge_date' => 'datetime:d-m-Y H:i:s',
+        'hospitalization_date' => 'datetime:d-m-Y',
+        'discharge_date' => 'datetime:d-m-Y',
     ];
     /**
      * Get the doctor that owns the MedicalCase

@@ -11,6 +11,7 @@
     <script src="https://unpkg.com/feather-icons"></script>
     <script src="https://code.jquery.com/jquery-3.7.1.js" integrity="sha256-eKhayi8LEQwp4NKxN+CfCh+3qOVUtJn3QNZ0TciWLP4="
         crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="user-id" content="{{ auth()->id() }}">
     
@@ -52,6 +53,11 @@
         }
         #chat-messages::-webkit-scrollbar-track { background: transparent; }
         #chat-messages::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 20px; }
+        #chat-messages > div > div {
+            overflow-wrap: anywhere;
+            word-break: break-word; 
+            min-width: 0;           
+        }
         .dark #chat-messages::-webkit-scrollbar-thumb { background-color: #475569; }
 
         /* Stile specifico per il processo di Thinking dell'AI */
@@ -85,6 +91,48 @@
         .chat-markdown p:last-child { margin-bottom: 0; }
         .chat-markdown ul { list-style-type: disc; margin-left: 1.5rem; }
         .chat-markdown strong { font-weight: 700; }
+
+        /* Stile compatto per il contenuto del pensiero */
+        .ai-thinking-content {
+            font-size: 0.8rem;      /* Testo leggermente più piccolo */
+            line-height: 1.4;       /* Interlinea più stretta */
+            color: #4b5563;
+            /* Rimuoviamo white-space pre-wrap qui per lasciare gestire il layout all'HTML di marked */
+            white-space: normal !important;
+            overflow-wrap: anywhere; 
+        }
+
+        /* Targettiamo TUTTI i possibili tag generati da marked all'interno del box */
+        .ai-thinking-content p, 
+        .ai-thinking-content ul, 
+        .ai-thinking-content ol, 
+        .ai-thinking-content blockquote, 
+        .ai-thinking-content pre {
+            margin-bottom: 0.4em !important; /* Spazio minimo tra blocchi */
+            margin-top: 0 !important;
+        }
+
+        /* Rimuove il margine dall'ultimo elemento per non avere spazio vuoto in fondo */
+        .ai-thinking-content *:last-child {
+            margin-bottom: 0 !important;
+        }
+
+        /* Gestione Liste: riduce il padding sinistro eccessivo */
+        .ai-thinking-content ul, 
+        .ai-thinking-content ol {
+            padding-left: 1.2em; 
+            list-style-position: outside;
+        }
+
+        /* Stile per i punti elenco specifici dentro il thinking */
+        .ai-thinking-content li {
+            margin-bottom: 0.1em;
+        }
+
+        /* Dark mode fix */
+        .dark .ai-thinking-content {
+            color: #d1d5db;
+        }
 
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
     </style>
@@ -179,7 +227,7 @@
                         @foreach ($data['medical_cases'] as $medical_case)
                             <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600 dark:text-blue-400">
-                                    #CASE-{{ $medical_case['id'] }}
+                                    <a href="/reports/{{ $medical_case['id'] }}">#CASE-{{ $medical_case['id'] }}</a>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                                     {{ $medical_case['patient']['name'] }}
@@ -206,22 +254,361 @@
         </div>
     </main>
 
-    <!-- MODAL NUOVA CASISTICA (Semplificato per brevity, usa ID per le Actions) -->
-    <div id="modal-nuova-casistica" class="fixed inset-0 z-50 bg-gray-900/50 backdrop-blur-sm flex items-center justify-center p-4 invisible opacity-0 transition-all duration-300">
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl transform transition-all scale-95 p-6">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-bold dark:text-white">Nuova Casistica</h3>
-                <button id="modal-close-btn"><i data-feather="x" class="text-gray-500"></i></button>
+
+    <div id="modal-nuova-casistica"
+        class="fixed inset-0 z-50 bg-gray-900 flex items-center justify-center p-4 invisible opacity-0 transition-opacity duration-300 ease-in-out">
+
+        <div id="modal-panel"
+            class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl overflow-hidden transform transition-all scale-95">
+
+            <!-- Modal Header -->
+            <div class="flex justify-between items-center p-4 border-b dark:border-gray-700">
+                <h3 class="text-lg font-medium text-gray-900 dark:text-white">Inserisci Nuova Casistica</h3>
+                <button id="modal-close-btn" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                    <i data-feather="x" class="w-5 h-5"></i>
+                </button>
             </div>
-            <form id="form-nuova-casistica">
-                <!-- Esempio campi -->
-                <input type="text" name="name" placeholder="Nome Paziente" class="w-full mb-3 p-2 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600">
-                <textarea name="anamnesi" placeholder="Anamnesi" class="w-full mb-3 p-2 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600"></textarea>
-                <div class="flex justify-end gap-2">
-                    <button type="button" id="modal-cancel-btn" class="px-4 py-2 border rounded text-gray-600 dark:text-gray-300">Annulla</button>
-                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Salva</button>
+
+            <!-- Modal Body (Form con icone) -->
+            <form id="form-nuova-casistica" class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                    <div class="md:col-span-2">
+                        <label for="paziente"
+                            class="block text-sm font-medium text-gray-700 dark:text-gray-300">Paziente</label>
+                        <div class="relative mt-1">
+                            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                <i data-feather="user" class="w-4 h-4 text-gray-400"></i>
+                            </div>
+                            <input type="text" name="name" id="paziente" placeholder="Name"
+                                class="py-2 block outline-none w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-10">
+                        </div>
+                    </div>
+                    <div>
+                        <label for="data_nascita"
+                            class="block text-sm font-medium text-gray-700 dark:text-gray-300">Data Nascita</label>
+                        <div class="relative mt-1">
+                            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                <i data-feather="calendar" class="w-4 h-4 text-gray-400"></i>
+                            </div>
+                            <input type="date" name="birthday" id="data_nascita" max="{{explode(' ', now())[0]}}"
+                                class="py-2 block outline-none pr-2 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-10">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="city" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Luogo
+                            di nascita</label>
+                        <div class="relative mt-1">
+                            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                <i data-feather="map" class="w-4 h-4 text-gray-400"></i>
+                            </div>
+                            <input type="text" name="city" id="city" placeholder="Luogo di nascita"
+                                class="py-2 block outline-none w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-10">
+                        </div>
+                    </div>
+
+                    <!-- Stato (con icona e chevron) -->
+                    <div class="md:col-span-2">
+                        <label for="stato"
+                            class="block text-sm font-medium text-gray-700 dark:text-gray-300">Stato</label>
+                        <div class="relative mt-1">
+                            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                <i data-feather="activity" class="w-4 h-4 text-gray-400"></i>
+                            </div>
+                            <select id="stato" name="stato"
+                                class="py-2 block outline-none block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-10 pr-10 appearance-none">
+                                <option>Aperto</option>
+                                <option>Analisi</option>
+                                <option>Revisione</option>
+                                <option>Chiuso</option>
+                            </select>
+                            <div
+                                class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400">
+                                <i data-feather="chevron-down" class="w-4 h-4"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Data Registrazione (con icona) -->
+                    <div class="md:col-span-2">
+                        <label for="data_registrazione"
+                            class="block text-sm font-medium text-gray-700 dark:text-gray-300">Data
+                            Registrazione</label>
+                        <div class="relative mt-1">
+                            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                <i data-feather="calendar" class="w-4 h-4 text-gray-400"></i>
+                            </div>
+                            <input type="date" name="hospitalization_date" id="data_registrazione" max="{{explode(' ', now())[0]}}"
+                                class="py-2 block outline-none pr-2 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-10">
+                        </div>
+                    </div>
+
+
+                    <!-- Diagnosi Ingresso (con icona) -->
+                    <div>
+                        <label for="diagnosi_passata"
+                            class="block text-sm font-medium text-gray-700 dark:text-gray-300">Anamnesi patologica
+                            remota</label>
+                        <div class="relative mt-1">
+                            <div class="pointer-events-none absolute top-3 left-0 flex items-center pl-3">
+                                <i data-feather="file-text" class="w-4 h-4 text-gray-400"></i>
+                            </div>
+                            <textarea id="diagnosi_passata" name="past_illness_history" rows="3"
+                                class="py-2 block outline-none w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-10"
+                                placeholder="Descrivere la diagnosi iniziale..."></textarea>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="diagnosi_attuale"
+                            class="block text-sm font-medium text-gray-700 dark:text-gray-300">Anamnesi patologica
+                            prossima</label>
+                        <div class="relative mt-1">
+                            <div class="pointer-events-none absolute top-3 left-0 flex items-center pl-3">
+                                <i data-feather="file-text" class="w-4 h-4 text-gray-400"></i>
+                            </div>
+                            <textarea id="diagnosi_attuale" name="present_illness_history" rows="3"
+                                class="py-2 block outline-none w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-10"
+                                placeholder="Descrivere la diagnosi attuale..."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="md:col-span-2">
+                        <label for="clinical_evolution"
+                            class="block text-sm font-medium text-gray-700 dark:text-gray-300">Decorso clinico</label>
+                        <div class="relative mt-1">
+                            <div class="pointer-events-none absolute top-3 left-0 flex items-center pl-3">
+                                <i data-feather="file-text" class="w-4 h-4 text-gray-400"></i>
+                            </div>
+                            <textarea id="clinical_evolution" name="clinical_evolution" rows="3"
+                                class="py-2 block outline-none w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-10"
+                                placeholder="Descrivere le eventuali evoluzioni cliniche..."></textarea>
+                        </div>
+                    </div>
+
+
+                    <div class="md:col-span-2">
+                        <label for="data_dimissione"
+                            class="block text-sm font-medium text-gray-700 dark:text-gray-300">Data Dimissione</label>
+                        <div class="relative mt-1">
+                            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                <i data-feather="calendar" class="w-4 h-4 text-gray-400"></i>
+                            </div>
+                            <input type="date" name="discharge_date" id="data_dimissione" max="{{explode(' ', now())[0]}}"
+                                class="py-2 block outline-none pr-2 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-10">
+                        </div>
+                    </div>
+
+
+                    <div id="dimission_text_wrapper" class="md:col-span-2 opacity-50 pointer-events-none select-none">
+                        <label for="dimission_text"
+                            class="block text-sm font-medium text-gray-700 dark:text-gray-300">Indicazioni alla
+                            dimissione e terapia domiciliare</label>
+                        <div class="relative mt-1">
+                            <div class="pointer-events-none absolute top-3 left-0 flex items-center pl-3">
+                                <i data-feather="file-text" class="w-4 h-4 text-gray-400"></i>
+                            </div>
+                            <textarea id="dimission_text" name="discharge_description" rows="3"
+                                class="py-2 block outline-none w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-10"
+                                placeholder="Descrivere le eventuali evoluzioni cliniche..."></textarea>
+                        </div>
+                    </div>
                 </div>
             </form>
+
+            <!-- Modal Footer (con animazioni hover) -->
+            <div
+                class="flex justify-end items-center p-4 bg-gray-50 dark:bg-gray-700 border-t dark:border-gray-600 space-x-3">
+                <button id="modal-cancel-btn"
+                    class="cursor-pointer bg-white dark:bg-gray-600 hover:bg-gray-100 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 py-2 px-4 rounded-md transition-all duration-150 ease-in-out border border-gray-300 dark:border-gray-500 shadow-sm text-sm font-medium transform hover:scale-[1.03] hover:shadow-md">
+                    Annulla
+                </button>
+                <button type="submit" form="form-nuova-casistica"
+                    class="hover:cursor-pointer bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md transition-all duration-150 ease-in-out shadow-sm text-sm font-medium transform hover:scale-[1.03] hover:shadow-md">
+                    Salva Casistica
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-modifica-casistica"
+        class="fixed inset-0 z-50 bg-gray-900  flex items-center justify-center p-4 invisible opacity-0 transition-opacity duration-300 ease-in-out">
+
+        <div id="modal-panel-modifica"
+            class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl overflow-hidden transform transition-all scale-95 duration-300 ease-in-out">
+
+            <!-- Modal Header -->
+            <div class="flex justify-between items-center p-4 border-b dark:border-gray-700">
+                <h3 class="text-lg font-medium text-gray-900 dark:text-white">Modifica Casistica</h3>
+                <!-- Pulsante 'X' per chiudere -->
+                <button id="modal-modifica-close-btn"
+                    class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                    <i data-feather="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- Modal Body (Form con icone) -->
+            <form id="form-modifica-casistica" class="p-6 overflow-y-auto" style="max-height: 80vh;">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                    <div class="md:col-span-2">
+                        <label for="paziente"
+                            class="block text-sm font-medium text-gray-700 dark:text-gray-300">Paziente</label>
+                        <div class="relative mt-1">
+                            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                <i data-feather="user" class="w-4 h-4 text-gray-400"></i>
+                            </div>
+                            <input type="text" name="name" disabled id="paziente" placeholder="Nome Cognome"
+                                class="py-2 block outline-none w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-10">
+                        </div>
+                    </div>
+                    <div>
+                        <label for="data_nascita"
+                            class="block text-sm font-medium text-gray-700 dark:text-gray-300">Data Nascita</label>
+                        <div class="relative mt-1">
+                            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                <i data-feather="calendar" class="w-4 h-4 text-gray-400"></i>
+                            </div>
+                            <input type="date" name="birthday" id="data_nascita" disabled max="{{explode(' ', now())[0]}}"
+                                class="py-2 block outline-none pr-2 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-10">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="city" class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                            disabled>Luogo di nascita</label>
+                        <div class="relative mt-1">
+                            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                <i data-feather="map" class="w-4 h-4 text-gray-400"></i>
+                            </div>
+                            <input type="text" name="city" id="city" disabled
+                                placeholder="Luogo di nascita"
+                                class="py-2 block outline-none w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-10">
+                        </div>
+                    </div>
+
+                    <!-- Stato (con icona e chevron) -->
+                    <div class="md:col-span-2">
+                        <label for="stato"
+                            class="block text-sm font-medium text-gray-700 dark:text-gray-300">Stato</label>
+                        <div class="relative mt-1">
+                            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                <i data-feather="activity" class="w-4 h-4 text-gray-400"></i>
+                            </div>
+                            <select id="stato" name="stato"
+                                class="py-2 block outline-none block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-10 pr-10 appearance-none">
+                                <option>Aperto</option>
+                                <option>Analisi</option>
+                                <option>Revisione</option>
+                                <option>Chiuso</option>
+                            </select>
+                            <div
+                                class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400">
+                                <i data-feather="chevron-down" class="w-4 h-4"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Data Registrazione (con icona) -->
+                    <div class="md:col-span-2">
+                        <label for="data_registrazione"
+                            class="block text-sm font-medium text-gray-700 dark:text-gray-300">Data
+                            Registrazione</label>
+                        <div class="relative mt-1">
+                            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                <i data-feather="calendar" class="w-4 h-4 text-gray-400"></i>
+                            </div>
+                            <input type="date" name="hospitalization_date" id="data_registrazione"  max="{{explode(' ', now())[0]}}"
+                                class="py-2 block outline-none pr-2 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-10">
+                        </div>
+                    </div>
+
+
+                    <!-- Diagnosi Ingresso (con icona) -->
+                    <div>
+                        <label for="diagnosi_passata"
+                            class="block text-sm font-medium text-gray-700 dark:text-gray-300">Anamnesi patologica
+                            remota</label>
+                        <div class="relative mt-1">
+                            <div class="pointer-events-none absolute top-3 left-0 flex items-center pl-3">
+                                <i data-feather="file-text" class="w-4 h-4 text-gray-400"></i>
+                            </div>
+                            <textarea id="diagnosi_passata" name="past_illness_history" rows="3"
+                                class="py-2 block outline-none w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-10"
+                                placeholder="Descrivere la diagnosi iniziale..."></textarea>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="diagnosi_attuale"
+                            class="block text-sm font-medium text-gray-700 dark:text-gray-300">Anamnesi patologica
+                            prossima</label>
+                        <div class="relative mt-1">
+                            <div class="pointer-events-none absolute top-3 left-0 flex items-center pl-3">
+                                <i data-feather="file-text" class="w-4 h-4 text-gray-400"></i>
+                            </div>
+                            <textarea id="diagnosi_attuale" name="present_illness_history" rows="3"
+                                class="py-2 block outline-none w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-10"
+                                placeholder="Descrivere la diagnosi attuale..."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="md:col-span-2">
+                        <label for="clinical_evolution"
+                            class="block text-sm font-medium text-gray-700 dark:text-gray-300">Decorso clinico</label>
+                        <div class="relative mt-1">
+                            <div class="pointer-events-none absolute top-3 left-0 flex items-center pl-3">
+                                <i data-feather="file-text" class="w-4 h-4 text-gray-400"></i>
+                            </div>
+                            <textarea id="clinical_evolution" name="clinical_evolution" rows="3"
+                                class="py-2 block outline-none w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-10"
+                                placeholder="Descrivere le eventuali evoluzioni cliniche..."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="md:col-span-2">
+                        <label for="data_dimissione"
+                            class="block text-sm font-medium text-gray-700 dark:text-gray-300">Data Dimissione</label>
+                        <div class="relative mt-1">
+                            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                                <i data-feather="calendar" class="w-4 h-4 text-gray-400"></i>
+                            </div>
+                            <input type="date" name="discharge_date" id="data_dimissione" max="{{explode(' ', now())[0]}}"
+                                class="py-2 block outline-none pr-2 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-10">
+                        </div>
+                    </div>
+
+
+                    <div id="dimission_text_wrapper" class="md:col-span-2 opacity-50 pointer-events-none select-none">
+                        <label for="dimission_text"
+                            class="block text-sm font-medium text-gray-700 dark:text-gray-300">Indicazioni alla
+                            dimissione e terapia domiciliare</label>
+                        <div class="relative mt-1">
+                            <div class="pointer-events-none absolute top-3 left-0 flex items-center pl-3">
+                                <i data-feather="file-text" class="w-4 h-4 text-gray-400"></i>
+                            </div>
+                            <textarea id="dimission_text" name="discharge_description" rows="3"
+                                class="py-2 block outline-none w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white pl-10"
+                                placeholder="Descrivere le eventuali evoluzioni cliniche..."></textarea>
+                        </div>
+                    </div>
+                </div>
+            </form>
+
+            <!-- Modal Footer (con animazioni hover) -->
+            <div
+                class="flex justify-end items-center p-4 bg-gray-50 dark:bg-gray-700 border-t dark:border-gray-600 space-x-3">
+                <!-- Pulsante 'Annulla' per chiudere -->
+                <button id="modal-modifica-cancel-btn"
+                    class="cursor-pointer bg-white dark:bg-gray-600 hover:bg-gray-100 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 py-2 px-4 rounded-md transition-all duration-150 ease-in-out border border-gray-300 dark:border-gray-500 shadow-sm text-sm font-medium transform hover:scale-[1.03] hover:shadow-md">
+                    Annulla
+                </button>
+                <button type="submit" form="form-modifica-casistica"
+                    class="hover:cursor-pointer bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md transition-all duration-150 ease-in-out shadow-sm text-sm font-medium transform hover:scale-[1.03] hover:shadow-md">
+                    Salva Modifiche
+                </button>
+            </div>
         </div>
     </div>
 

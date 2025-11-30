@@ -16,10 +16,6 @@ $(function () {
             formData[n['name']] = n['value'];
         });
 
-        formData["hospitalization_date"] = formData["hospitalization_date"].replace("T", " ") + ":00"
-
-        console.log(formData)
-
         Swal.fire({
             title: 'Salvataggio in corso...',
             text: 'Attendere prego.',
@@ -162,14 +158,6 @@ $(function () {
             if(n['value'] !== undefined && n['value'].length > 0) formData[n['name']] = n['value'];
         });
 
-        formData["hospitalization_date"] = formData["hospitalization_date"].replace("T", " ")+":00"
-        if(formData["discharge_date"] === undefined){
-            delete formData["discharge_date"]
-            delete formData["discharge_description"]
-        }else{
-            formData["discharge_date"] = formData["discharge_date"]?.replace("T", " ")+":00"
-        }
-
         Swal.fire({
             title: 'Salvataggio in corso...',
             text: 'Attendere prego.',
@@ -213,30 +201,6 @@ $(function () {
 
     });
 
-
-    function formatDateToDateTimeLocal(s) {
-        if (!s) return '';
-
-        try {
-            // Input: "30-10-2025 23:08:00"
-            const [datePart, timePart] = s.split(' '); // ["30-10-2025", "23:08:00"]
-
-            const [day, month, year] = datePart.split('-'); // [30, 10, 2025]
-            const [hour, minute] = timePart.split(':'); // [23, 08]
-
-            // Format YYYY-MM-DD
-            const isoDate = `${year}-${month}-${day}`;
-            // Format HH:MM
-            const isoTime = `${hour}:${minute}`;
-
-            // Output: "2025-10-30T23:08"
-            return `${isoDate}T${isoTime}`;
-        } catch (e) {
-            console.error("Errore formattazione data:", s, e);
-            return ''; // Ritorna stringa vuota in caso di errore
-        }
-    }
-
     $(".editbtn").click(function(){
         const medical_case = $(this).data("medical-case-id")
         console.log(medical_case)
@@ -250,22 +214,25 @@ $(function () {
         }).done(function (response) {
             const data = response.response
 
+            let [hospitalization_date_day, hospitalization_date_month, hospitalization_date_year] = data.hospitalization_date.split("-");
+            let [discharge_date_day, discharge_date_month, discharge_date_year] = data.discharge_date.split("-");
+
             $('#form-modifica-casistica #paziente').val(data.patient.name);
             $('#form-modifica-casistica #data_nascita').val(data.patient.birthday ? data.patient.birthday.split(' ')[0] : '');
             $('#form-modifica-casistica #city').val(data.patient.city);
 
             $('#form-modifica-casistica #stato').val(data.status);
-            $('#form-modifica-casistica #data_registrazione').val(formatDateToDateTimeLocal(data.hospitalization_date));
+            $('#form-modifica-casistica #data_registrazione').val(`${hospitalization_date_year}-${hospitalization_date_month}-${hospitalization_date_day}`);
             $('#form-modifica-casistica #diagnosi_passata').val(data.past_illness_history);
             $('#form-modifica-casistica #diagnosi_attuale').val(data.present_illness_history);
             $('#form-modifica-casistica #clinical_evolution').val(data.clinical_evolution);
 
-            console.log(data.discharge_date?.slice(0, -3))
-            console.log(data)
-            $('#form-modifica-casistica #data_dimissione').val(formatDateToDateTimeLocal(data.discharge_date?.slice(0, -3)));
+            $('#form-modifica-casistica #data_dimissione').val(`${discharge_date_year}-${discharge_date_month}-${discharge_date_day}`);
             $('#form-modifica-casistica #dimission_text').val(data?.discharge_description);
 
-            $('#form-modifica-casistica #data_dimissione').trigger('change');
+            // $('#form-modifica-casistica #data_dimissione').trigger('change');
+            $('#form-modifica-casistica #dimission_text_wrapper').removeClass('opacity-50 pointer-events-none select-none');
+
             document.body.style.overflow = 'hidden'; // Blocca lo scroll
             $modal.removeClass('invisible opacity-0');
             $modalPanel.removeClass('scale-95');

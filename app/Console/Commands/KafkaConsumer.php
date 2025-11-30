@@ -54,7 +54,7 @@ class KafkaConsumer extends Command
         $report_db->doctorId = $report["doctor"];
         $report_db->save();
 
-        SendJobNotification::dispatch($report["jobId"], $report["doctor"], $job["chunks"], $report_db);
+        SendJobNotification::dispatch($report["jobId"], $report["doctor"], $job["chunks"], $report);
     }
 
     /**

@@ -18,10 +18,10 @@ class PatientResource extends JsonResource
         return [
             "id" => $this->id,
             "name" => $this->name,
-            "birthday" => Carbon::parse($this->birthday)->format('d/m/Y h:i:s'),
+            "birthday" => Carbon::parse($this->birthday)->format('d/m/Y'),
             "city" => $this->city,
-            "created_at" => Carbon::parse($this->created_at)->format('d/m/Y h:i:s'),
-            "updated_at" => Carbon::parse($this->updated_at)->format('d/m/Y h:i:s')
+            "created_at" => Carbon::parse($this->created_at)->format('d/m/Y'),
+            "updated_at" => Carbon::parse($this->updated_at)->format('d/m/Y')
         ];
     }
 }
