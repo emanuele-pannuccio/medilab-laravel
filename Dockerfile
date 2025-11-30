@@ -10,10 +10,13 @@ RUN apk add --no-cache libzip-dev zip shadow \
     g++ \
     make \
     librdkafka-dev \
-    && docker-php-ext-install pdo pdo_mysql zip bcmath pcntl
+    supervisor \
+    && rm  -rf /tmp/* /var/cache/apk/*\
+    && docker-php-ext-install pdo pdo_mysql zip bcmath pcntl 
 
 RUN pecl install rdkafka && docker-php-ext-enable rdkafka
 
+COPY --chown=1000:1000 supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 RUN usermod --uid 1000 www-data
 
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
